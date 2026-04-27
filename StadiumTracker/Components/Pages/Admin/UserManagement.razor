@@ -1,0 +1,99 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using StadiumTracker.Data
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin — Users</PageTitle>
+<h3>User Management</h3>
+
+@if (message is not null)
+{
+    <div class="alert alert-info">@message</div>
+}
+
+<table class="table table-bordered">
+    <thead class="table-dark">
+        <tr><th>Email</th><th>Username</th><th>Roles</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var row in userRows)
+        {
+            <tr>
+                <td>@row.Email</td>
+                <td>@row.UserName</td>
+                <td>
+                    @foreach (var role in row.Roles)
+                    {
+                        <span class="badge bg-primary me-1">@role</span>
+                    }
+                </td>
+                <td>
+                    @if (row.Roles.Contains("Admin"))
+                    {
+                        <button class="btn btn-sm btn-outline-danger"
+                                @onclick="() => RemoveAdmin(row.UserId)">Remove Admin</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-success"
+                                @onclick="() => MakeAdmin(row.UserId)">Make Admin</button>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<UserRow> userRows = [];
+    private string? message;
+
+    protected override async Task OnInitializedAsync() => await LoadUsers();
+
+    private async Task LoadUsers()
+    {
+        var users = UserManager.Users.ToList();
+        userRows = [];
+        foreach (var user in users)
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            userRows.Add(new UserRow
+            {
+                UserId   = user.Id,
+                Email    = user.Email ?? "",
+                UserName = user.UserName ?? "",
+                Roles    = roles.ToList()
+            });
+        }
+    }
+
+    private async Task MakeAdmin(string userId)
+    {
+        var user = await UserManager.FindByIdAsync(userId);
+        if (user is null) return;
+        await UserManager.AddToRoleAsync(user, "Admin");
+        message = $"{user.Email} is now an Admin.";
+        await LoadUsers();
+    }
+
+    private async Task RemoveAdmin(string userId)
+    {
+        var user = await UserManager.FindByIdAsync(userId);
+        if (user is null) return;
+        await UserManager.RemoveFromRoleAsync(user, "Admin");
+        message = $"Admin role removed from {user.Email}.";
+        await LoadUsers();
+    }
+
+    private class UserRow
+    {
+        public string UserId   { get; set; } = "";
+        public string Email    { get; set; } = "";
+        public string UserName { get; set; } = "";
+        public List<string> Roles { get; set; } = [];
+    }
+}
