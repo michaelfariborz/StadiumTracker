@@ -1,7 +1,100 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@inject ILeagueService LeagueService
+@inject IStadiumService StadiumService
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+@attribute [Authorize]
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Stadium Map</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="d-flex gap-2 mb-2 flex-wrap">
+    @foreach (var league in leagues)
+    {
+        <button class="btn @(league.Id == selectedLeagueId ? "btn-primary" : "btn-outline-secondary") btn-sm"
+                @onclick="() => SelectLeague(league.Id)">
+            @league.Abbreviation
+        </button>
+    }
+</div>
 
-Welcome to your new app.
+<div id="stadium-map" style="height:calc(100vh - 140px); width:100%; border-radius:8px;"></div>
+
+@code {
+    private List<League> leagues = [];
+    private List<Stadium> stadiums = [];
+    private int selectedLeagueId;
+    private DotNetObjectReference<Home>? dotNetRef;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        leagues = await LeagueService.GetAllLeaguesAsync();
+        if (leagues.Count > 0)
+        {
+            selectedLeagueId = leagues[0].Id;
+            await LoadStadiums();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("leafletInterop.initMap", "stadium-map", 39.5, -98.35, 4);
+            await RefreshPins();
+        }
+    }
+
+    private async Task SelectLeague(int leagueId)
+    {
+        selectedLeagueId = leagueId;
+        await LoadStadiums();
+        await RefreshPins();
+    }
+
+    private async Task LoadStadiums()
+    {
+        if (userId is null) return;
+        stadiums = await StadiumService.GetStadiumsByLeagueWithUserVisitsAsync(selectedLeagueId, userId);
+    }
+
+    private async Task RefreshPins()
+    {
+        var pins = stadiums.Select(s => new {
+            id        = s.Id,
+            name      = s.Name,
+            homeTeam  = s.HomeTeam,
+            city      = s.City,
+            state     = s.State,
+            latitude  = s.Latitude,
+            longitude = s.Longitude,
+            visited   = s.Visits.Any(),
+            visits    = s.Visits.Select(v => new {
+                visitDate    = v.VisitDate?.ToString("o"),
+                opponentTeam = v.OpponentTeam,
+                score        = v.Score
+            }).ToArray()
+        }).ToArray();
+
+        await JS.InvokeVoidAsync("leafletInterop.addPins", pins, dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task OpenAddVisitFromMap(int stadiumId)
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => dotNetRef?.Dispose();
+}
