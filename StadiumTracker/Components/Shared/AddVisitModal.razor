@@ -1,0 +1,105 @@
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IStadiumVisitService VisitService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Visit</h5>
+                <button type="button" class="btn-close" @onclick="OnClose"></button>
+            </div>
+            <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    @if (errorMessage is not null)
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    @if (PreselectedStadiumId.HasValue)
+                    {
+                        var stadium = Stadiums.FirstOrDefault(s => s.Id == PreselectedStadiumId.Value);
+                        <p><strong>@stadium?.Name</strong> &mdash; @stadium?.HomeTeam</p>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Stadium</label>
+                            <InputSelect class="form-select" @bind-Value="model.StadiumId">
+                                <option value="0">-- Select a stadium --</option>
+                                @foreach (var s in Stadiums)
+                                {
+                                    <option value="@s.Id">@s.Name (@s.HomeTeam)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => model.StadiumId" />
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Date Visited (optional)</label>
+                        <InputDate class="form-control" @bind-Value="model.VisitDate" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opponent Team (optional)</label>
+                        <InputText class="form-control" @bind-Value="model.OpponentTeam" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Score (optional, e.g. 4-2)</label>
+                        <InputText class="form-control" @bind-Value="model.Score" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="OnClose">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Visit</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<Stadium> Stadiums { get; set; } = [];
+    [Parameter] public int? PreselectedStadiumId { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnVisitSaved { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnClose { get; set; }
+
+    private VisitModel model = new();
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        if (PreselectedStadiumId.HasValue)
+            model.StadiumId = PreselectedStadiumId.Value;
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        var stadiumId = PreselectedStadiumId ?? model.StadiumId;
+        if (stadiumId <= 0) { errorMessage = "Please select a stadium."; return; }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null) { errorMessage = "You must be logged in."; return; }
+
+        try
+        {
+            await VisitService.AddVisitAsync(stadiumId, userId, model.VisitDate, model.OpponentTeam, model.Score);
+            await OnVisitSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving visit: {ex.Message}";
+        }
+    }
+
+    private class VisitModel
+    {
+        public int StadiumId { get; set; }
+        public DateTime? VisitDate { get; set; }
+        public string? OpponentTeam { get; set; }
+        public string? Score { get; set; }
+    }
+}

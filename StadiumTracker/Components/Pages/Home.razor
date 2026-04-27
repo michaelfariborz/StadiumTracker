@@ -25,12 +25,22 @@
 
 <div id="stadium-map" style="height:calc(100vh - 140px); width:100%; border-radius:8px;"></div>
 
+@if (showModal)
+{
+    <AddVisitModal Stadiums="stadiums"
+                   PreselectedStadiumId="preselectedStadiumId"
+                   OnVisitSaved="HandleVisitSaved"
+                   OnClose="() => showModal = false" />
+}
+
 @code {
     private List<League> leagues = [];
     private List<Stadium> stadiums = [];
     private int selectedLeagueId;
     private DotNetObjectReference<Home>? dotNetRef;
     private string? userId;
+    private bool showModal;
+    private int? preselectedStadiumId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,7 +103,16 @@
     [JSInvokable]
     public async Task OpenAddVisitFromMap(int stadiumId)
     {
+        preselectedStadiumId = stadiumId;
+        showModal = true;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleVisitSaved()
+    {
+        showModal = false;
+        await LoadStadiums();
+        await RefreshPins();
     }
 
     public void Dispose() => dotNetRef?.Dispose();
