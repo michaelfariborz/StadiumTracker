@@ -46,6 +46,7 @@ const leafletInterop = (() => {
             const el = document.getElementById(containerId);
             if (!el) return;
             if (map) { map.remove(); map = null; }
+            dotNetRef = null;
             map = L.map(containerId).setView([lat, lon], zoom);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -67,6 +68,7 @@ const leafletInterop = (() => {
 
         clearPins() {
             if (markerLayer) markerLayer.clearLayers();
+            dotNetRef = null;
         },
 
         triggerAddVisit(stadiumId) {

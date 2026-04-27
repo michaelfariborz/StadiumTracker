@@ -63,9 +63,16 @@
         var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (userId is null) { errorMessage = "Not authenticated."; return; }
 
-        var ok = await VisitService.UpdateVisitAsync(Visit.Id, userId, model.VisitDate, model.OpponentTeam, model.Score);
-        if (!ok) { errorMessage = "Update failed."; return; }
-        await OnVisitSaved.InvokeAsync();
+        try
+        {
+            var ok = await VisitService.UpdateVisitAsync(Visit.Id, userId, model.VisitDate, model.OpponentTeam, model.Score);
+            if (!ok) { errorMessage = "Update failed."; return; }
+            await OnVisitSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating visit: {ex.Message}";
+        }
     }
 
     private async Task HandleDelete()
@@ -73,8 +80,15 @@
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (userId is null) return;
-        await VisitService.DeleteVisitAsync(Visit.Id, userId);
-        await OnVisitSaved.InvokeAsync();
+        try
+        {
+            await VisitService.DeleteVisitAsync(Visit.Id, userId);
+            await OnVisitSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting visit: {ex.Message}";
+        }
     }
 
     private class EditModel
