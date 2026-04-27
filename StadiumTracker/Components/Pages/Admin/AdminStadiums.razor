@@ -1,0 +1,147 @@
+@page "/admin/stadiums"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@inject ILeagueService LeagueService
+@inject IStadiumService StadiumService
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin — Stadiums</PageTitle>
+<h3>Manage Stadiums</h3>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Add Stadium</h5>
+        <EditForm Model="newStadium" OnValidSubmit="HandleAddStadium">
+            <DataAnnotationsValidator />
+            @if (errorMessage is not null) { <div class="alert alert-danger">@errorMessage</div> }
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">League</label>
+                    <InputSelect class="form-select" @bind-Value="newStadium.LeagueId">
+                        <option value="0">-- Select --</option>
+                        @foreach (var l in leagues)
+                        {
+                            <option value="@l.Id">@l.Abbreviation</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Stadium Name</label>
+                    <InputText class="form-control" @bind-Value="newStadium.Name" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Home Team</label>
+                    <InputText class="form-control" @bind-Value="newStadium.HomeTeam" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">City</label>
+                    <InputText class="form-control" @bind-Value="newStadium.City" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">State</label>
+                    <InputText class="form-control" @bind-Value="newStadium.State" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Latitude</label>
+                    <InputNumber class="form-control" @bind-Value="newStadium.Latitude" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Longitude</label>
+                    <InputNumber class="form-control" @bind-Value="newStadium.Longitude" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Description (optional)</label>
+                    <InputText class="form-control" @bind-Value="newStadium.Description" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Add Stadium</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Filter by League:</label>
+    <select class="form-select w-auto d-inline-block ms-2" @onchange="FilterChanged">
+        <option value="0">All Leagues</option>
+        @foreach (var l in leagues)
+        {
+            <option value="@l.Id">@l.Abbreviation</option>
+        }
+    </select>
+</div>
+
+<table class="table table-sm table-bordered">
+    <thead class="table-dark">
+        <tr><th>League</th><th>Stadium</th><th>Home Team</th><th>City</th><th>State</th><th>Lat</th><th>Lng</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var s in filteredStadiums)
+        {
+            <tr>
+                <td>@s.League.Abbreviation</td>
+                <td>@s.Name</td>
+                <td>@s.HomeTeam</td>
+                <td>@s.City</td>
+                <td>@s.State</td>
+                <td>@s.Latitude.ToString("F4")</td>
+                <td>@s.Longitude.ToString("F4")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<League> leagues = [];
+    private List<Stadium> allStadiums = [];
+    private List<Stadium> filteredStadiums = [];
+    private int filterLeagueId;
+    private StadiumFormModel newStadium = new();
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        leagues = await LeagueService.GetAllLeaguesAsync();
+        allStadiums = await StadiumService.GetAllStadiumsAsync();
+        filteredStadiums = allStadiums;
+    }
+
+    private void FilterChanged(ChangeEventArgs e)
+    {
+        filterLeagueId = int.Parse(e.Value?.ToString() ?? "0");
+        filteredStadiums = filterLeagueId == 0
+            ? allStadiums
+            : allStadiums.Where(s => s.LeagueId == filterLeagueId).ToList();
+    }
+
+    private async Task HandleAddStadium()
+    {
+        errorMessage = null;
+        if (newStadium.LeagueId == 0) { errorMessage = "Please select a league."; return; }
+        try
+        {
+            await StadiumService.AddStadiumAsync(newStadium.LeagueId, newStadium.Name,
+                newStadium.HomeTeam, newStadium.City, newStadium.State,
+                newStadium.Latitude, newStadium.Longitude, newStadium.Description);
+            newStadium = new();
+            allStadiums = await StadiumService.GetAllStadiumsAsync();
+            FilterChanged(new ChangeEventArgs { Value = filterLeagueId.ToString() });
+        }
+        catch (Exception ex) { errorMessage = ex.Message; }
+    }
+
+    private class StadiumFormModel
+    {
+        public int LeagueId { get; set; }
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = "";
+        [System.ComponentModel.DataAnnotations.Required] public string HomeTeam { get; set; } = "";
+        [System.ComponentModel.DataAnnotations.Required] public string City { get; set; } = "";
+        [System.ComponentModel.DataAnnotations.Required] public string State { get; set; } = "";
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public string? Description { get; set; }
+    }
+}
