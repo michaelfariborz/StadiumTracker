@@ -1,0 +1,96 @@
+@page "/admin/leagues"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@inject ILeagueService LeagueService
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin — Leagues</PageTitle>
+<h3>Manage Leagues</h3>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Add League</h5>
+        <EditForm Model="newLeague" OnValidSubmit="HandleAddLeague">
+            <DataAnnotationsValidator />
+            @if (errorMessage is not null)
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Name</label>
+                    <InputText class="form-control" @bind-Value="newLeague.Name" />
+                    <ValidationMessage For="() => newLeague.Name" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Abbreviation</label>
+                    <InputText class="form-control" @bind-Value="newLeague.Abbreviation" />
+                    <ValidationMessage For="() => newLeague.Abbreviation" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort Order</label>
+                    <InputNumber class="form-control" @bind-Value="newLeague.SortOrder" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Add League</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<table class="table table-bordered">
+    <thead class="table-dark">
+        <tr><th>Abbr</th><th>Name</th><th>Sort Order</th><th>Stadium Count</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var league in leagues)
+        {
+            <tr>
+                <td>@league.Abbreviation</td>
+                <td>@league.Name</td>
+                <td>@league.SortOrder</td>
+                <td>@league.Stadiums.Count</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<League> leagues = [];
+    private LeagueFormModel newLeague = new();
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await LoadLeagues();
+
+    private async Task LoadLeagues()
+    {
+        leagues = await LeagueService.GetAllLeaguesAsync();
+    }
+
+    private async Task HandleAddLeague()
+    {
+        errorMessage = null;
+        try
+        {
+            await LeagueService.AddLeagueAsync(newLeague.Name, newLeague.Abbreviation, newLeague.SortOrder);
+            newLeague = new();
+            await LoadLeagues();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private class LeagueFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = "";
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(20)]
+        public string Abbreviation { get; set; } = "";
+        public int SortOrder { get; set; }
+    }
+}
