@@ -1,0 +1,86 @@
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IStadiumVisitService VisitService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Visit — @Stadium.Name</h5>
+                <button type="button" class="btn-close" @onclick="OnClose"></button>
+            </div>
+            <EditForm Model="model" OnValidSubmit="HandleUpdate">
+                <div class="modal-body">
+                    @if (errorMessage is not null)
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Date Visited (optional)</label>
+                        <InputDate class="form-control" @bind-Value="model.VisitDate" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opponent Team (optional)</label>
+                        <InputText class="form-control" @bind-Value="model.OpponentTeam" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Score (optional)</label>
+                        <InputText class="form-control" @bind-Value="model.Score" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto"
+                            @onclick="HandleDelete">Remove Visit</button>
+                    <button type="button" class="btn btn-secondary" @onclick="OnClose">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Visit</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public StadiumVisit Visit { get; set; } = null!;
+    [Parameter, EditorRequired] public Stadium Stadium { get; set; } = null!;
+    [Parameter, EditorRequired] public EventCallback OnVisitSaved { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnClose { get; set; }
+
+    private EditModel model = new();
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        model.VisitDate    = Visit.VisitDate;
+        model.OpponentTeam = Visit.OpponentTeam;
+        model.Score        = Visit.Score;
+    }
+
+    private async Task HandleUpdate()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null) { errorMessage = "Not authenticated."; return; }
+
+        var ok = await VisitService.UpdateVisitAsync(Visit.Id, userId, model.VisitDate, model.OpponentTeam, model.Score);
+        if (!ok) { errorMessage = "Update failed."; return; }
+        await OnVisitSaved.InvokeAsync();
+    }
+
+    private async Task HandleDelete()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId is null) return;
+        await VisitService.DeleteVisitAsync(Visit.Id, userId);
+        await OnVisitSaved.InvokeAsync();
+    }
+
+    private class EditModel
+    {
+        public DateTime? VisitDate { get; set; }
+        public string? OpponentTeam { get; set; }
+        public string? Score { get; set; }
+    }
+}

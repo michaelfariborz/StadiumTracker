@@ -1,0 +1,155 @@
+@page "/stadiums"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using StadiumTracker.Data.Models
+@using StadiumTracker.Services
+@inject ILeagueService LeagueService
+@inject IStadiumService StadiumService
+@inject IStadiumVisitService VisitService
+@inject AuthenticationStateProvider AuthStateProvider
+@attribute [Authorize]
+
+<PageTitle>My Stadium Visits</PageTitle>
+<h3>My Stadium Visits</h3>
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    @foreach (var league in leagues)
+    {
+        <button class="btn @(league.Id == selectedLeagueId ? "btn-primary" : "btn-outline-secondary") btn-sm"
+                @onclick="() => SelectLeague(league.Id)">
+            @league.Abbreviation
+        </button>
+    }
+</div>
+
+<table class="table table-bordered table-hover">
+    <thead class="table-dark">
+        <tr>
+            <th>Stadium</th>
+            <th>Home Team</th>
+            <th>City</th>
+            <th>Status</th>
+            <th>Visits</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var stadium in stadiums)
+        {
+            var visited = stadium.Visits.Any();
+            <tr>
+                <td>@stadium.Name</td>
+                <td>@stadium.HomeTeam</td>
+                <td>@stadium.City, @stadium.State</td>
+                <td>
+                    @if (visited)
+                    {
+                        <span class="badge bg-success">Visited</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Not Visited</span>
+                    }
+                </td>
+                <td>
+                    @foreach (var visit in stadium.Visits.OrderByDescending(v => v.VisitDate ?? v.CreatedAt))
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <small>
+                                @(visit.VisitDate?.ToString("MM/dd/yyyy") ?? "No date")
+                                @if (visit.OpponentTeam is not null) { <text> vs @visit.OpponentTeam</text> }
+                                @if (visit.Score is not null) { <text> — @visit.Score</text> }
+                            </small>
+                            <button class="btn btn-sm btn-outline-primary"
+                                    @onclick="() => OpenEdit(visit, stadium)">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    @onclick="() => ConfirmDelete(visit.Id)">✕</button>
+                        </div>
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-success"
+                            @onclick="() => OpenAdd(stadium.Id)">+ Add Visit</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (showAddModal)
+{
+    <AddVisitModal Stadiums="stadiums"
+                   PreselectedStadiumId="addStadiumId"
+                   OnVisitSaved="HandleVisitSaved"
+                   OnClose="() => showAddModal = false" />
+}
+
+@if (showEditModal && editVisit is not null && editStadium is not null)
+{
+    <EditVisitModal Visit="editVisit"
+                    Stadium="editStadium"
+                    OnVisitSaved="HandleVisitSaved"
+                    OnClose="() => showEditModal = false" />
+}
+
+@code {
+    private List<League> leagues = [];
+    private List<Stadium> stadiums = [];
+    private int selectedLeagueId;
+    private string? userId;
+
+    private bool showAddModal;
+    private int? addStadiumId;
+
+    private bool showEditModal;
+    private StadiumVisit? editVisit;
+    private Stadium? editStadium;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        leagues = await LeagueService.GetAllLeaguesAsync();
+        if (leagues.Count > 0)
+        {
+            selectedLeagueId = leagues[0].Id;
+            await LoadStadiums();
+        }
+    }
+
+    private async Task SelectLeague(int leagueId)
+    {
+        selectedLeagueId = leagueId;
+        await LoadStadiums();
+    }
+
+    private async Task LoadStadiums()
+    {
+        if (userId is null) return;
+        stadiums = await StadiumService.GetStadiumsByLeagueWithUserVisitsAsync(selectedLeagueId, userId);
+    }
+
+    private void OpenAdd(int stadiumId) { addStadiumId = stadiumId; showAddModal = true; }
+
+    private void OpenEdit(StadiumVisit visit, Stadium stadium)
+    {
+        editVisit = visit;
+        editStadium = stadium;
+        showEditModal = true;
+    }
+
+    private async Task ConfirmDelete(int visitId)
+    {
+        if (userId is null) return;
+        await VisitService.DeleteVisitAsync(visitId, userId);
+        await LoadStadiums();
+    }
+
+    private async Task HandleVisitSaved()
+    {
+        showAddModal = false;
+        showEditModal = false;
+        await LoadStadiums();
+    }
+}
