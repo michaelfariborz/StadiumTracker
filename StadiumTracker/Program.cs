@@ -100,4 +100,30 @@ app.MapAdditionalIdentityEndpoints();
 
 await app.RunAsync();
 
-public partial class Program { }  // expose to test project
+public partial class Program
+{
+    public static async Task SeedAdminUserAsync(
+        UserManager<ApplicationUser> userManager,
+        string email,
+        string password)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+
+        if (user is null)
+        {
+            user = new ApplicationUser { UserName = email, Email = email };
+            var createResult = await userManager.CreateAsync(user, password);
+            if (!createResult.Succeeded)
+                throw new InvalidOperationException(
+                    $"Failed to create admin user: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
+        }
+
+        if (!await userManager.IsInRoleAsync(user, "Admin"))
+        {
+            var roleResult = await userManager.AddToRoleAsync(user, "Admin");
+            if (!roleResult.Succeeded)
+                throw new InvalidOperationException(
+                    $"Failed to assign Admin role: {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
+        }
+    }
+}
