@@ -107,15 +107,18 @@ public partial class Program
         string email,
         string password)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+
         var user = await userManager.FindByEmailAsync(email);
 
         if (user is null)
         {
-            user = new ApplicationUser { UserName = email, Email = email };
+            user = new ApplicationUser { UserName = email, Email = email }; // Identity convention: use email as username
             var createResult = await userManager.CreateAsync(user, password);
             if (!createResult.Succeeded)
                 throw new InvalidOperationException(
-                    $"Failed to create admin user: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
+                    $"Failed to create admin user '{email}': {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
         }
 
         if (!await userManager.IsInRoleAsync(user, "Admin"))
@@ -123,7 +126,7 @@ public partial class Program
             var roleResult = await userManager.AddToRoleAsync(user, "Admin");
             if (!roleResult.Succeeded)
                 throw new InvalidOperationException(
-                    $"Failed to assign Admin role: {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
+                    $"Failed to assign Admin role to '{email}': {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
         }
     }
 }
