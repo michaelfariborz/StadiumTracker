@@ -45,6 +45,7 @@ const leafletInterop = (() => {
         initMap(containerId, lat, lon, zoom) {
             const el = document.getElementById(containerId);
             if (!el) return;
+            if (typeof L === 'undefined') return;
             if (map) { map.remove(); map = null; }
             dotNetRef = null;
             map = L.map(containerId).setView([lat, lon], zoom);
