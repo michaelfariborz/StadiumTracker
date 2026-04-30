@@ -13,7 +13,7 @@
 <PageTitle>My Stadium Visits</PageTitle>
 <h3>My Stadium Visits</h3>
 
-<div class="d-flex gap-2 mb-3 flex-wrap">
+<div class="d-flex gap-2 mb-2 flex-wrap">
     @foreach (var league in leagues)
     {
         <button class="btn @(league.Id == selectedLeagueId ? "btn-primary" : "btn-outline-secondary") btn-sm"
@@ -22,6 +22,20 @@
         </button>
     }
 </div>
+
+@if (stadiums.Count > 0)
+{
+    <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <small class="text-muted">@VisitedCount of @stadiums.Count stadiums visited</small>
+            <small class="text-muted fw-semibold">@VisitedPercent%</small>
+        </div>
+        <div class="progress" style="height:6px;" role="progressbar"
+             aria-valuenow="@VisitedPercent" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width:@VisitedPercent%; background-color:var(--color-primary);"></div>
+        </div>
+    </div>
+}
 
 <table class="table table-bordered table-hover">
     <thead class="table-dark">
@@ -98,6 +112,9 @@
     private List<Stadium> stadiums = [];
     private int selectedLeagueId;
     private string? userId;
+
+    private int VisitedCount => stadiums.Count(s => s.Visits.Any());
+    private int VisitedPercent => stadiums.Count > 0 ? VisitedCount * 100 / stadiums.Count : 0;
 
     private bool showAddModal;
     private int? addStadiumId;
