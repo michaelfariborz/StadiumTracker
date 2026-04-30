@@ -23,6 +23,20 @@
     }
 </div>
 
+@if (stadiums.Count > 0)
+{
+    <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <small class="text-muted">@VisitedCount of @stadiums.Count stadiums visited</small>
+            <small class="text-muted fw-semibold">@VisitedPercent%</small>
+        </div>
+        <div class="progress" style="height:6px;" role="progressbar"
+             aria-valuenow="@VisitedPercent" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width:@VisitedPercent%; background-color:var(--color-primary);"></div>
+        </div>
+    </div>
+}
+
 <div id="stadium-map" style="height:calc(100vh - 140px); width:100%; border-radius:8px;"></div>
 
 @if (showModal)
@@ -41,6 +55,9 @@
     private string? userId;
     private bool showModal;
     private int? preselectedStadiumId;
+
+    private int VisitedCount => stadiums.Count(s => s.Visits.Any());
+    private int VisitedPercent => stadiums.Count > 0 ? VisitedCount * 100 / stadiums.Count : 0;
 
     protected override async Task OnInitializedAsync()
     {
